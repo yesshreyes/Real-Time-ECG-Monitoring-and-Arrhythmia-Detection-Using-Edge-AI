@@ -34,22 +34,21 @@ This project explores a **software-first, hardware-independent approach** to arr
 ## Development Roadmap
 
 ### Dataset & Model Preparation
-- [ ] Download and explore MIT-BIH Arrhythmia Dataset
-- [ ] Extract ECG signals and corresponding labels
-- [ ] Normalize ECG signal values
-- [ ] Segment ECG into fixed-length windows / beats
-- [ ] Prepare training and validation datasets
+- [x] Download and explore MIT-BIH Arrhythmia Dataset
+- [x] Extract ECG signals and corresponding labels
+- [x] Normalize ECG signal values
+- [x] Segment ECG into fixed-length windows / beats
+- [x] Prepare training and validation datasets
 
 ### Deep Learning Model
-- [ ] Design lightweight 1D CNN architecture for ECG classification
-- [ ] Train model on preprocessed ECG data
-- [ ] Evaluate model accuracy and loss
-- [ ] Optimize model for mobile inference
-- [ ] Convert trained model to TensorFlow Lite (`.tflite`)
+- [x] Design lightweight 1D CNN architecture for ECG classification
+- [x] Train model on preprocessed ECG data
+- [x] Evaluate model accuracy and loss
+- [x] Optimize model for mobile inference
+- [x] Convert trained model to TensorFlow Lite (`.tflite`)
 
 ### Android Project Setup
 - [ ] Create Android project using Kotlin and Jetpack Compose
-- [ ] Set up app architecture (ViewModel, StateFlow)
 - [ ] Add ECG waveform rendering using Canvas / MPAndroidChart
 - [ ] Implement lifecycle-aware real-time data updates
 
