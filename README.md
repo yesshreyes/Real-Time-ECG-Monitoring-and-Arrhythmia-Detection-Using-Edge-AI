@@ -48,9 +48,9 @@ This project explores a **software-first, hardware-independent approach** to arr
 - [x] Convert trained model to TensorFlow Lite (`.tflite`)
 
 ### Android Project Setup
-- [ ] Create Android project using Kotlin and Jetpack Compose
-- [ ] Add ECG waveform rendering using Canvas / MPAndroidChart
-- [ ] Implement lifecycle-aware real-time data updates
+- [x] Create Android project using Kotlin and Jetpack Compose
+- [x] Add ECG waveform rendering using Canvas / MPAndroidChart
+- [x] Implement lifecycle-aware real-time data updates
 
 ### ECG Stream Simulation
 - [ ] Load ECG signal files into Android app
