@@ -33,7 +33,6 @@ fun ConnectScreen(
     val connected by viewModel.isConnected.collectAsState()
     val context = LocalContext.current
 
-    // 🔥 Handle toast + delayed navigation
     LaunchedEffect(connected) {
         if (connected) {
             Toast.makeText(
@@ -41,8 +40,6 @@ fun ConnectScreen(
                 "Device connected successfully",
                 Toast.LENGTH_SHORT
             ).show()
-
-            delay(2000) // ⏳ 2 seconds
             onConnected()
         }
     }

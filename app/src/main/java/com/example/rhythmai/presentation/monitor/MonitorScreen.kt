@@ -3,23 +3,27 @@ package com.example.rhythmai.presentation.monitor
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.platform.LocalLifecycleOwner
 
 @Composable
 fun MonitorScreen(
-    onStatsClick: () -> Unit,
-    viewModel: MonitorViewModel = viewModel()
+    viewModel: MonitorViewModel,
+    onStatsClick: () -> Unit
 ) {
+    val isLoading by viewModel.isLoading.collectAsState()
     val bpm by viewModel.bpm.collectAsState()
-    val isAbnormal by viewModel.isAbnormal.collectAsState()
     val samples by viewModel.ecgSamples.collectAsState()
+    val prediction by viewModel.prediction.collectAsState()
+    val confidence by viewModel.confidence.collectAsState()
+    val isAbnormal by viewModel.isAbnormal.collectAsState()
+
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -31,12 +35,29 @@ fun MonitorScreen(
                 else -> Unit
             }
         }
-
         lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+    if (isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(12.dp))
+                Text("Initializing ECG stream…")
+            }
         }
+        return
+    }
+
+    val rhythmColor = when (prediction) {
+        "Normal" -> Color(0xFF2E7D32) // green
+        "Supraventricular Arrhythmia" -> Color(0xFFF9A825) // amber
+        "Ventricular Arrhythmia" -> Color(0xFFC62828) // red
+        else -> Color.White
     }
 
     Column(
@@ -45,39 +66,112 @@ fun MonitorScreen(
             .padding(16.dp)
     ) {
 
-        Text("Live ECG Monitor", fontSize = 22.sp)
+        /* ---------- HEADER ---------- */
 
-        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Real-Time ECG Monitor",
+            fontSize = 22.sp,
+            style = MaterialTheme.typography.titleLarge
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        /* ---------- ECG WAVEFORM ---------- */
 
         EcgWaveform(samples = samples)
 
         Spacer(Modifier.height(16.dp))
 
-        Text("Heart Rate: $bpm BPM", fontSize = 20.sp)
+        /* ---------- HEART RATE ---------- */
+
+        Text(
+            text = "Heart Rate",
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+
+        Text(
+            text = "$bpm BPM",
+            fontSize = 28.sp,
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        /* ---------- RHYTHM ANALYSIS ---------- */
+
+        Text(
+            text = "Rhythm Analysis",
+            fontSize = 18.sp,
+            style = MaterialTheme.typography.titleMedium
+        )
 
         Spacer(Modifier.height(8.dp))
 
+        Text(
+            text = prediction,
+            fontSize = 20.sp,
+            color = rhythmColor,
+            style = MaterialTheme.typography.titleLarge
+        )
+
+        Text(
+            text = "Confidence: ${(confidence * 100).toInt()}%",
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        /* ---------- ALERT ---------- */
+
         if (isAbnormal) {
-            Text(
-                "⚠ Arrhythmia Detected",
-                color = Color.Red,
-                fontSize = 18.sp
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Button(
-                onClick = {},
-                colors = ButtonDefaults.buttonColors(Color.Red)
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFFEBEE)
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("SOS", color = Color.White)
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    Text(
+                        text = "⚠ Possible Arrhythmia Detected",
+                        color = Color(0xFFC62828),
+                        fontSize = 16.sp
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { /* SOS / demo action */ },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFC62828)
+                        )
+                    ) {
+                        Text("SOS", color = Color.White)
+                    }
+                }
             }
         }
 
         Spacer(Modifier.weight(1f))
 
-        Button(onClick = onStatsClick) {
-            Text("View Stats")
+        /* ---------- FOOTER ---------- */
+
+        Text(
+            text = "For educational and research use only.\nNot for clinical diagnosis.",
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        Button(
+            onClick = onStatsClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("View Arrhythmia Events")
         }
     }
 }

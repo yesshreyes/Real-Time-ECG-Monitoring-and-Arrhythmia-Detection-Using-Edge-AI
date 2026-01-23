@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.rhythmai"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -62,4 +62,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("org.tensorflow:tensorflow-lite:2.12.0")
 }

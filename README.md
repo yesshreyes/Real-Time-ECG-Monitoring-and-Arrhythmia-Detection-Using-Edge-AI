@@ -22,61 +22,128 @@ This project explores a **software-first, hardware-independent approach** to arr
 ## Key Features
 
 - Real-time ECG waveform visualization
-- On-device deep learning inference (TensorFlow Lite)
-- Arrhythmia classification (Normal / Abnormal)
-- Low-latency predictions (no cloud dependency)
-- Confidence score and inference time display
-- Dataset-driven ECG stream simulation
-- Android-native implementation
+- Multi-class arrhythmia detection (Normal, Supraventricular, Ventricular)
+- On-device deep learning inference using TensorFlow Lite
+- Low-latency predictions with no cloud dependency
+- Confidence score–based rhythm classification
+- Temporal smoothing and consecutive abnormal detection
+- Persistent SOS alert for detected arrhythmia
+- Real-time heart rate (BPM) estimation
+- Arrhythmia event logging with timestamps and confidence
+- Dataset-driven real-time ECG stream simulation
+- Android-native implementation using Kotlin and Jetpack Compose
+- Edge AI–focused design with privacy-preserving inference
+- Extensible architecture for future AI assistant integration
 
 ---
 
 ## Development Roadmap
 
-### Dataset & Model Preparation
+### Dataset & Signal Preparation
 - [x] Download and explore MIT-BIH Arrhythmia Dataset
-- [x] Extract ECG signals and corresponding labels
-- [x] Normalize ECG signal values
-- [x] Segment ECG into fixed-length windows / beats
-- [x] Prepare training and validation datasets
+- [x] Analyze ECG sampling frequency and signal characteristics
+- [x] Extract ECG signals and corresponding annotation labels
+- [x] Normalize ECG signal values (z-score normalization)
+- [x] Segment ECG into fixed-length beat-centered windows (360 samples)
+- [x] Expand dataset to include multiple patient records
+- [x] Perform inter-patient train–validation split to avoid data leakage
+- [x] Map annotation symbols into clinically meaningful rhythm classes
+    - Normal
+    - Supraventricular Arrhythmia
+    - Ventricular Arrhythmia
 
-### Deep Learning Model
-- [x] Design lightweight 1D CNN architecture for ECG classification
-- [x] Train model on preprocessed ECG data
-- [x] Evaluate model accuracy and loss
-- [x] Optimize model for mobile inference
-- [x] Convert trained model to TensorFlow Lite (`.tflite`)
+---
 
-### Android Project Setup
+### Signal Processing Enhancement
+- [x] Apply band-pass filtering (0.5–40 Hz) to remove baseline wander and noise
+- [x] Compare raw vs filtered ECG signals
+- [ ] Implement and analyze R-peak detection accuracy
+- [x] Justify window size and stride based on ECG physiology
+
+---
+
+### Deep Learning Model Development
+- [x] Design lightweight 1D CNN architecture optimized for edge devices
+- [x] Train CNN model on preprocessed ECG segments
+- [x] Extend model from binary to multi-class classification
+- [x] Evaluate model using medical metrics:
+    - Accuracy
+    - Sensitivity (Recall)
+    - Specificity
+    - F1-score
+    - Confusion matrix
+- [ ] Compare CNN performance with an alternative lightweight architecture
+- [x] Analyze overfitting and generalization behavior
+
+---
+
+### Edge AI Optimization & Deployment
+- [x] Convert trained Keras model to TensorFlow Lite format
+- [x] Apply post-training quantization (INT8 / dynamic range)
+- [x] Measure model size reduction after quantization
+FP32 model size: 713.47 KB
+INT8 model size: 185.18 KB
+Reduction: 74.05%
+- [ ] Benchmark inference latency on Android device
+- [ ] Analyze power and performance trade-offs for edge inference
+- [ ] Justify on-device inference over cloud-based solutions (privacy & latency)
+
+---
+
+### Android Application Development
 - [x] Create Android project using Kotlin and Jetpack Compose
-- [x] Add ECG waveform rendering using Canvas / MPAndroidChart
-- [x] Implement lifecycle-aware real-time data updates
+- [x] Implement real-time ECG waveform rendering
+- [x] Build lifecycle-aware streaming pipeline
+- [x] Display real-time heart rate (BPM) estimation
+- [x] Maintain smooth UI updates under continuous data flow
 
-### ECG Stream Simulation
-- [ ] Load ECG signal files into Android app
-- [ ] Implement timed ECG sample emitter (simulated real-time stream)
-- [ ] Smoothly scroll ECG waveform on UI
-- [ ] Display real-time BPM estimation
+---
 
-### On-Device Inference
-- [ ] Integrate TensorFlow Lite interpreter
-- [ ] Implement sliding window buffer for ECG samples
-- [ ] Run periodic inference on buffered data
-- [ ] Display predicted rhythm class and confidence score
+### Real-Time ECG Stream Simulation
+- [x] Load ECG signal data from assets
+- [x] Simulate real-time ECG data streaming (~360 Hz)
+- [x] Implement circular buffer for ECG samples
+- [x] Maintain sliding window for continuous inference
+- [x] Control inference frequency to balance latency and accuracy
 
-### Alerts & User Interaction
-- [ ] Detect abnormal / arrhythmic heart rhythms
-- [ ] Trigger phone vibration on arrhythmia detection
-- [ ] Display visual alert for abnormal rhythm
-- [ ] Show prominent **SOS button** on arrhythmia detection
-- [ ] Log detected arrhythmia events with timestamps
+---
 
-### Finalization & Demo Prep
-- [ ] Optimize UI performance and inference latency
-- [ ] Add model accuracy and inference time information
-- [ ] Record app demo video
-- [ ] Finalize README documentation
-- [ ] Prepare presentation slides and explanation
+### On-Device Arrhythmia Inference
+- [x] Integrate TensorFlow Lite interpreter in Android
+- [x] Perform real-time inference using sliding ECG windows
+- [x] Display predicted rhythm class with confidence score
+- [x] Smooth prediction outputs to reduce false positives
+- [x] Track consecutive abnormal detections for reliability
+
+---
+
+### Alerts, Safety & User Interaction
+- [x] Detect abnormal cardiac rhythms in real time
+- [x] Trigger haptic feedback (vibration) on arrhythmia detection
+- [x] Display visual alerts for abnormal rhythms
+- [x] Provide emergency **SOS** action option
+- [x] Log arrhythmia events with timestamps and confidence
+- [ ] Add medical disclaimer and safety notice
+- [ ] Implement alert cooldown to prevent alarm fatigue
+
+---
+
+### Evaluation & Performance Analysis
+- [ ] Compare model performance before and after optimization
+- [ ] Measure real-time inference latency on mobile device
+- [ ] Analyze detection delay in streaming scenario
+- [ ] Evaluate false positive and false negative cases
+- [ ] Discuss limitations and failure cases
+
+---
+
+### Finalization & Demonstration
+- [ ] Optimize UI rendering and inference pipeline
+- [ ] Display model accuracy and inference time within app
+- [ ] Record real-time app demonstration video
+- [ ] Finalize project documentation and README
+- [ ] Prepare final presentation and viva explanation
+- [ ] Outline future work (wearables, BLE ECG sensors, clinical validation)
 
 ---
 
