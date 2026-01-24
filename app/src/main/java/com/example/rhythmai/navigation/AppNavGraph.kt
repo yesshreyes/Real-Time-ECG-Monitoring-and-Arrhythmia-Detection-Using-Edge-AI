@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -15,6 +16,7 @@ import com.example.rhythmai.presentation.monitor.MonitorScreen
 import com.example.rhythmai.presentation.monitor.MonitorViewModel
 import com.example.rhythmai.presentation.monitor.MonitorViewModelFactory
 import com.example.rhythmai.presentation.stats.StatsScreen
+import com.example.rhythmai.presentation.stats.StatsViewModel
 
 @Composable
 fun AppNavGraph() {
@@ -30,6 +32,10 @@ fun AppNavGraph() {
     val monitorViewModel: MonitorViewModel = viewModel(
         factory = MonitorViewModelFactory(context)
     )
+
+    val statsViewModel: StatsViewModel = remember {
+        StatsViewModel(monitorViewModel)
+    }
 
     Scaffold(
         bottomBar = {
@@ -64,7 +70,7 @@ fun AppNavGraph() {
 
             composable("stats") {
                 StatsScreen(
-                    viewModel = monitorViewModel
+                    viewModel = statsViewModel
                 )
             }
         }
