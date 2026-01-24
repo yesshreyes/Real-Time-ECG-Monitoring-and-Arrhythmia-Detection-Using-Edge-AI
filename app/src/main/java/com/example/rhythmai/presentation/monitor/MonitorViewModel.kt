@@ -11,7 +11,8 @@ import androidx.core.view.drawToBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rhythmai.data.EcgAssetLoader
-import com.example.rhythmai.data.EcgTwoStageClassifier
+import com.example.rhythmai.data.EcgThreeStageClassifier
+import com.example.rhythmai.data.QualityStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +59,7 @@ class MonitorViewModel(
     private val inferenceBuffer = ArrayDeque<Float>()
 
     // TFLite
-    private lateinit var classifier: EcgTwoStageClassifier
+    private lateinit var classifier: EcgThreeStageClassifier
 
     private var lastAbnormalState = false
 
@@ -70,6 +71,11 @@ class MonitorViewModel(
 
     private var consecutiveAbnormalCount = 0
 
+    private val _qualityScore = MutableStateFlow(1.0f)
+    val qualityScore = _qualityScore.asStateFlow()
+
+    private val _qualityStatus = MutableStateFlow(QualityStatus.GOOD)
+    val qualityStatus = _qualityStatus.asStateFlow()
 
     private val _stage1Threshold = MutableStateFlow(0.5f)
     val stage1Threshold = _stage1Threshold.asStateFlow()
@@ -93,7 +99,7 @@ class MonitorViewModel(
                         fileName = "200_ekg.csv",
                         leadName = "MLII"
                     )
-                    classifier = EcgTwoStageClassifier(context)
+                    classifier = EcgThreeStageClassifier(context)
                 }
             }
 
@@ -156,30 +162,45 @@ class MonitorViewModel(
 
     private fun runInference() {
         val window = inferenceBuffer.toFloatArray()
+        // 1️⃣ Get detailed prediction (includes quality check)
+        val detailedResult = classifier.predictDetailed(window)
 
-        // Use two-stage prediction
-        val (result, conf) = classifier.predict(window)
+        // 2️⃣ Update quality state for UI
+        _qualityScore.value = detailedResult.qualityScore
+        _qualityStatus.value = detailedResult.qualityStatus
+
+        // 3️⃣ If poor quality, show message and skip inference
+        if (detailedResult.qualityStatus == QualityStatus.BAD) {
+            _prediction.value = detailedResult.message ?: "Poor signal quality"
+            _confidence.value = 0f
+            consecutiveAbnormalCount = 0  // Reset to avoid false triggers
+            return  // Skip rest of inference
+        }
+
+        // 4️⃣ Extract prediction results (only if quality is GOOD)
+        val result = detailedResult.finalClass
+        val conf = detailedResult.confidence
+
         _prediction.value = result
         _confidence.value = conf
-        // Better abnormal detection logic
-        val abnormalWithConfidence =
-            result != "Normal" && conf >= CONFIDENCE_THRESHOLD
+
+        // 5️⃣ Your existing abnormal detection logic (unchanged)
+        val abnormalWithConfidence = result != "Normal" && conf >= CONFIDENCE_THRESHOLD
+
         if (abnormalWithConfidence) {
             consecutiveAbnormalCount++
         } else {
             consecutiveAbnormalCount = 0
         }
-        if (
-            consecutiveAbnormalCount >= REQUIRED_CONSECUTIVE_ABNORMAL &&
-            !_alertLatched.value
-        ) {
+
+        // 6️⃣ Trigger alert if needed (with quality score)
+        if (consecutiveAbnormalCount >= REQUIRED_CONSECUTIVE_ABNORMAL && !_alertLatched.value) {
             _alertLatched.value = true
             _isAbnormal.value = true
             triggerVibration()
-            logArrhythmiaEvent(result, conf)  // Pass result type
+            logArrhythmiaEvent(result, conf, detailedResult.qualityScore)
         }
     }
-
 
     private fun triggerVibration() {
         val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE)
@@ -201,11 +222,16 @@ class MonitorViewModel(
         MutableStateFlow<List<ArrhythmiaEvent>>(emptyList())
     val events = _events.asStateFlow()
 
-    private fun logArrhythmiaEvent(arrhythmiaType: String, confidence: Float) {
+    private fun logArrhythmiaEvent(
+        arrhythmiaType: String,
+        confidence: Float,
+        qualityScore: Float  // NEW parameter
+    ) {
         val event = ArrhythmiaEvent(
             timestamp = System.currentTimeMillis(),
-            arrhythmiaType = arrhythmiaType,  // New field
-            confidence = confidence
+            arrhythmiaType = arrhythmiaType,
+            confidence = confidence,
+            qualityScore = qualityScore  // NEW field
         )
         _events.value = _events.value + event
     }
@@ -254,6 +280,6 @@ class MonitorViewModel(
 data class ArrhythmiaEvent(
     val timestamp: Long,
     val arrhythmiaType: String,
-    val confidence: Float
+    val confidence: Float,
+    val qualityScore: Float
 )
-

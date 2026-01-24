@@ -1,23 +1,22 @@
 package com.example.rhythmai.presentation.stats
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Divider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import java.text.SimpleDateFormat
+import java.util.*
 @Composable
 fun StatsScreen(
     viewModel: StatsViewModel
 ) {
     val events by viewModel.events.collectAsState()
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -25,40 +24,10 @@ fun StatsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
-        /* ---------------- MODEL ARCHITECTURE ---------------- */
-
-        item {
-            SectionTitle("Model Architecture")
-            viewModel.modelArchitecture.forEach {
-                StatRow(it.first, it.second)
-            }
-            SmallNote(
-                "Stage 1 filters normal beats quickly. Stage 2 classifies abnormal beats precisely."
-            )
-        }
-
-        item { Divider() }
-
-        /* ---------------- MODEL PERFORMANCE ---------------- */
-
-        item {
-            SectionTitle("Model Performance (Offline Evaluation)")
-            viewModel.modelPerformance.forEach {
-                StatRow(it.first, it.second)
-            }
-            SmallNote(
-                "Metrics obtained during offline evaluation using labeled ECG data."
-            )
-        }
-
-        item { Divider() }
-
         /* ---------------- ARRHYTHMIA EVENTS ---------------- */
-
         item {
             SectionTitle("Detected Arrhythmia Events")
         }
-
         if (events.isEmpty()) {
             item {
                 Text(
@@ -69,25 +38,50 @@ fun StatsScreen(
             }
         } else {
             items(events.reversed()) { event ->
-                ArrhythmiaEventCard(event)
+                ArrhythmiaEventItem(event)
             }
         }
+        item { Divider() }
+        /* ---------------- MODEL ARCHITECTURE ---------------- */
+        item {
+            SectionTitle("Three-Stage Model Architecture")
+
+            StatRow("SQI Model", "Signal Quality Filter (~15K params)")
+            StatRow("Stage 1", "Normal vs Abnormal (~50K params)")
+            StatRow("Stage 2", "SV vs Ventricular (~150K params)")
+
+            SmallNote(
+                "Three-stage cascade: SQI filters bad signals → Stage 1 screens abnormalities → Stage 2 diagnoses arrhythmia type."
+            )
+        }
+
+        item { Divider() }
+        /* ---------------- MODEL PERFORMANCE ---------------- */
+        item {
+            SectionTitle("Model Performance")
+            viewModel.modelPerformance.forEach {
+                StatRow(it.first, it.second)
+            }
+            SmallNote(
+                "Metrics from offline evaluation on MIT-BIH Arrhythmia Database. SQI model prevents false alarms from noisy signals."
+            )
+        }
+
+
+
     }
 }
 
-
-
 /* ---------------- UI HELPERS ---------------- */
-
 @Composable
 private fun SectionTitle(title: String) {
     Text(
         text = title,
         fontSize = 20.sp,
+        fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
     )
 }
-
 @Composable
 private fun StatRow(label: String, value: String) {
     Row(
@@ -95,16 +89,20 @@ private fun StatRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(label, fontSize = 15.sp)
-        Text(value, fontSize = 15.sp)
+        Text(value, fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
-
 @Composable
 private fun SmallNote(text: String) {
     Spacer(Modifier.height(4.dp))
     Text(
         text = text,
         fontSize = 12.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        lineHeight = 16.sp
     )
+}
+private fun formatTimestamp(timestamp: Long): String {
+    val sdf = SimpleDateFormat("MMM dd, HH:mm:ss", Locale.getDefault())
+    return sdf.format(Date(timestamp))
 }

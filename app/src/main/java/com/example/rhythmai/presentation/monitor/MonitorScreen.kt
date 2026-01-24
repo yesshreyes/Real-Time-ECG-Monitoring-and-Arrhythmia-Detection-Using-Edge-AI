@@ -41,6 +41,9 @@ fun MonitorScreen(
         else -> Color.White
     }
 
+    val qualityStatus by viewModel.qualityStatus.collectAsState()
+    val qualityScore by viewModel.qualityScore.collectAsState()
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -74,6 +77,7 @@ fun MonitorScreen(
             .verticalScroll(rememberScrollState())
     ) {
 
+
         /* ---------- HEADER ---------- */
 
         Text(
@@ -81,6 +85,14 @@ fun MonitorScreen(
             fontSize = 22.sp,
             style = MaterialTheme.typography.titleLarge
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SignalQualityCard(
+            qualityStatus = qualityStatus,
+            qualityScore = qualityScore
+        )
+
 
         Spacer(Modifier.height(12.dp))
 
@@ -90,57 +102,19 @@ fun MonitorScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Heart Rate", fontSize = 14.sp, color = Color.Gray)
-                Text("$bpm BPM", fontSize = 28.sp)
-            }
-
-            IconButton(
-                onClick = {
-                    coroutineScope.launch {
-                        viewModel.captureEcgFromView(rootView)
-                    }
+        PredictionCard(
+            prediction = prediction,
+            confidence = confidence,
+            qualityStatus = qualityStatus,
+            bpm=bpm,
+            onCaptureClick = {
+                coroutineScope.launch {
+                    viewModel.captureEcgFromView(rootView)
                 }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = "Capture ECG",
-                    tint = Color(0xFF2E7D32),
-                    modifier = Modifier.size(28.dp)
-                )
             }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = prediction,
-            fontSize = 18.sp,
-            color = rhythmColor
         )
 
-        Text(
-            text = "Confidence: ${(confidence * 100).toInt()}%",
-            fontSize = 12.sp,
-            color = Color.Gray
-        )
-
-        Text(
-            text = "Recorded: ${
-                SimpleDateFormat(
-                    "dd-MM-yyyy HH:mm:ss",
-                    Locale.getDefault()
-                ).format(Date())
-            }",
-            fontSize = 11.sp,
-            color = Color.Gray
-        )
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         /* ---------- ALERT ---------- */
 

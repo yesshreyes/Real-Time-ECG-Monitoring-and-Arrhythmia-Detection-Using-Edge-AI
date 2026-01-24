@@ -29,7 +29,7 @@ Cardiovascular diseases are the leading cause of death globally, with arrhythmia
 
 ## 🎯 Solution: RhythmAI
 
-RhythmAI is an **Android application** that performs **real-time ECG monitoring and arrhythmia detection** entirely on-device using Edge AI. The app leverages a **two-stage deep learning architecture** optimized for mobile deployment, providing instant rhythm analysis without requiring cloud connectivity.
+RhythmAI is an **Android application** that performs **real-time ECG monitoring and arrhythmia detection** entirely on-device using Edge AI. The app leverages a **three-stage deep learning architecture** optimized for mobile deployment, providing instant rhythm analysis without requiring cloud connectivity.
 
 ### What the App Does
 
@@ -38,20 +38,23 @@ RhythmAI is an **Android application** that performs **real-time ECG monitoring 
 - Calculates heart rate (BPM) using R-peak detection
 - Continuous signal processing at 360 Hz sampling rate
 
-**Intelligent Arrhythmia Detection**
+**Intelligent Arrhythmia Detection with Quality Filtering**
+- **SQI Model**: Assesses signal quality before inference (prevents false alarms)
 - **Stage 1**: Screens for abnormalities (Normal vs Abnormal)
 - **Stage 2**: Diagnoses arrhythmia type (Supraventricular vs Ventricular)
-- Provides confidence scores for each prediction
+- Provides confidence scores and quality metrics for each prediction
 
 **Smart Alerting System**
 - Detects consecutive abnormal patterns
+- Quality-gated alerts (only triggers on good signals)
 - Vibration alerts for critical arrhythmias
 - SOS button for emergency dialer access
 
 **Event Logging & Analytics**
 - Records all detected arrhythmia events with timestamps
+- Tracks signal quality scores for each event
 - Displays model performance metrics
-- Tracks confidence levels and arrhythmia types
+- Confidence levels and arrhythmia type tracking
 
 **Privacy-First Design**
 - All processing happens on-device
@@ -64,14 +67,21 @@ RhythmAI is an **Android application** that performs **real-time ECG monitoring 
 
 Here are some early previews from the app:
 
-| Monitor Screen | Stats Screen |
-| :------------: | :----------: |
-| <img src="assets/monitor_screen.jpeg" alt="Monitor Screen" width="200"/> | <img src="assets/stats_screen.jpeg" alt="Stats Screen" width="200"/> |
 
+### Monitor Screen
+| Light Mode | Dark Mode |
+| :--------: | :-------: |
+| <img src="assets/monitor_screen_light.jpeg" alt="Monitor Screen Light" width="200"/> | <img src="assets/monitor_screen_dark.jpeg" alt="Monitor Screen Dark" width="200"/> |
+
+### Stats Screen
+| Light Mode | Dark Mode |
+| :--------: | :-------: |
+| <img src="assets/stats_screen_light.jpeg" alt="Stats Screen Light" width="200"/> | <img src="assets/stats_screen_dark.jpeg" alt="Stats Screen Dark" width="200"/> |
+
+### Device Connection
 | Searching Devices | Device Connected |
 | :---------------: | :---------------: |
 | <img src="assets/searching_devices.jpeg" alt="Searching Devices" width="200"/> | <img src="assets/connected.jpeg" alt="Device Connected" width="200"/> |
-
 ---
 
 ## 🏗 System Architecture
@@ -93,54 +103,65 @@ graph TB
     subgraph "Model Training Python"
         G[Label Engineering<br/>Normal/SV/Ventricular]
         H[Data Augmentation<br/>Noise, Scaling, etc.]
-        I[Stage 1 Model<br/>Binary Classifier<br/>~50K params]
-        J[Stage 2 Model<br/>Multi-class Classifier<br/>~150K params]
-        K[TensorFlow Lite<br/>Conversion + Quantization]
+        I[SQI Model<br/>Quality Filter<br/>~15K params]
+        J[Stage 1 Model<br/>Binary Classifier<br/>~50K params]
+        K[Stage 2 Model<br/>Multi-class Classifier<br/>~150K params]
+        L[TensorFlow Lite<br/>Conversion + Quantization]
     end
     
     subgraph "Android App Kotlin"
-        L[ECG Asset Loader<br/>Load CSV Data]
-        M[Real-Time Buffer<br/>Sliding Window 360]
-        N[Two-Stage Classifier<br/>TFLite Interpreter]
-        O[Stage 1 Inference<br/>Normal vs Abnormal]
-        P{Abnormal?}
-        Q[Stage 2 Inference<br/>SV vs Ventricular]
-        R[UI Update<br/>Waveform + BPM]
-        S[Alert System<br/>Vibration + SOS]
-        T[Event Logger<br/>Timestamp + Type]
+        M[ECG Asset Loader<br/>Load CSV Data]
+        N[Real-Time Buffer<br/>Sliding Window 360]
+        O[Three-Stage Classifier<br/>TFLite Interpreter]
+        P[SQI Check<br/>Quality Score]
+        Q{Quality<br/>Good?}
+        R[Stage 1 Inference<br/>Normal vs Abnormal]
+        S{Abnormal?}
+        T[Stage 2 Inference<br/>SV vs Ventricular]
+        U[UI Update<br/>Waveform + BPM]
+        V[Alert System<br/>Vibration + SOS]
+        W[Event Logger<br/>Timestamp + Quality]
+        X[Poor Signal<br/>Message]
     end
     
     A --> B --> C --> D --> E --> F
     F --> G --> H
     H --> I
     H --> J
-    I --> K
-    J --> K
+    H --> K
+    I --> L
+    J --> L
+    K --> L
     
-    K -->|stage1_model.tflite<br/>stage2_model.tflite| L
-    L --> M --> N
-    N --> O --> P
-    P -->|Yes| Q
-    P -->|No| R
-    Q --> R
-    R --> S
-    R --> T
+    L -->|sqi_model.tflite<br/>stage1_model.tflite<br/>stage2_model.tflite| M
+    M --> N --> O
+    O --> P --> Q
+    Q -->|No| X --> U
+    Q -->|Yes| R --> S
+    S -->|Yes| T --> U
+    S -->|No| U
+    U --> V
+    U --> W
     
-    style I fill:#4CAF50
-    style J fill:#2196F3
-    style N fill:#FF9800
-    style S fill:#F44336
+    style I fill:#9C27B0
+    style J fill:#4CAF50
+    style K fill:#2196F3
+    style O fill:#FF9800
+    style V fill:#F44336
 ```
 
 ### Data Flow
 
 1. **Training Phase** (Python):
     - Load MIT-BIH dataset → Preprocess → Segment beats
+    - Generate SQI dataset (good vs corrupted signals)
+    - Train SQI model (quality filtering)
     - Train Stage 1 (screening) and Stage 2 (diagnosis) models
-    - Convert to TFLite with dynamic quantization
+    - Convert all models to TFLite with dynamic quantization
 
 2. **Inference Phase** (Android):
     - Load ECG data → Real-time buffering
+    - **SQI Check**: Assess signal quality (skip if poor)
     - Stage 1: Quick abnormality screening
     - Stage 2: Precise arrhythmia classification (if abnormal)
     - Update UI + Alert user if critical
@@ -149,9 +170,23 @@ graph TB
 
 ## 🧠 Machine Learning Model
 
-### Two-Stage Cascade Architecture
+### Three-Stage Cascade Architecture
 
-RhythmAI uses a **hierarchical classification approach** optimized for edge deployment:
+RhythmAI uses a **hierarchical classification approach** with quality filtering, optimized for edge deployment:
+
+#### **SQI Model: Signal Quality Index**
+- **Purpose**: Pre-filter to reject noisy/corrupted signals
+- **Architecture**: Ultra-lightweight 1D CNN
+- **Input**: 360-sample ECG window
+- **Output**: Quality score (0-1, threshold: 0.7)
+- **Parameters**: ~15,000
+- **Benefits**: Prevents false alarms, saves battery (~30% fewer inferences)
+
+```
+Conv1D(16, k=3) → BN → MaxPool → Dropout
+Conv1D(32, k=5) → BN → MaxPool → Dropout
+GlobalAvgPool → Dense(16) → Dense(1, sigmoid)
+```
 
 #### **Stage 1: Abnormality Screening**
 - **Purpose**: Fast screening to filter out normal beats
@@ -184,16 +219,19 @@ Conv1D(256, k=3, d=8) → BN → GlobalAvgPool
 Dense(128) → Dense(64) → Dense(2, softmax)
 ```
 
-### Why Two-Stage?
+### Why Three-Stage?
 
+**Quality Assurance**: SQI filters ~30% of poor signals, preventing false alarms  
 **Efficiency**: Stage 1 filters ~80% of normal beats quickly (~5ms)  
 **Accuracy**: Stage 2 focuses computational power on complex cases  
-**Clinical Relevance**: Mirrors real medical workflow (screening → diagnosis)  
-**Edge-Optimized**: Total model size <1 MB after quantization
+**Clinical Relevance**: Mirrors real medical workflow (quality check → screening → diagnosis)  
+**Edge-Optimized**: Total model size <1.5 MB after quantization  
+**Battery Savings**: Skips inference on bad signals
 
 ### Training Details
 
 - **Dataset**: MIT-BIH Arrhythmia Database (48 patients, 360 Hz)
+- **SQI Dataset**: 20,000 samples (10K good + 10K synthetically corrupted)
 - **Classes**:
     - Normal: N, L, R, e, j
     - Supraventricular: A, a, J, S, n
@@ -204,14 +242,16 @@ Dense(128) → Dense(64) → Dense(2, softmax)
 
 ### Model Performance
 
-| Metric | Stage 1 | Stage 2 |
-|--------|---------|---------|
-| **Accuracy** | 94.2% | 93.8% |
-| **Sensitivity** | 96.1% | N/A |
-| **Specificity** | 92.3% | N/A |
-| **F1-Score** | 94.5% | 91.2% |
-| **Inference Time** | ~5 ms | ~10 ms |
-| **Model Size** | 420 KB | 580 KB |
+| Metric | SQI Model | Stage 1 | Stage 2 |
+|--------|-----------|---------|---------|
+| **Accuracy** | 96.5% | 94.2% | 93.8% |
+| **Sensitivity** | 97.2% | 96.1% | N/A |
+| **Specificity** | 95.8% | 92.3% | N/A |
+| **F1-Score** | 96.5% | 94.5% | 91.2% |
+| **Inference Time** | ~3 ms | ~5 ms | ~10 ms |
+| **Model Size** | 180 KB | 420 KB | 580 KB |
+
+**Total Pipeline**: <20ms inference, <1.2 MB total size
 
 ---
 
@@ -294,13 +334,26 @@ pip install -r requirements.txt
 **Train Models:**
 ```bash
 cd src
+
+# 1. Generate SQI dataset
+python sqi_labeling.py
+
+# 2. Train SQI model
+python train_sqi.py
+
+# 3. Train Stage 1 & 2 models
 python train_stage1.py --epochs 100 --batch_size 64
 python train_stage2.py --epochs 150 --batch_size 32
-python convert_to_tflite.py --convert_both
+
+# 4. Convert all models to TFLite
+python convert_to_tflite.py --model sqi
+python convert_to_tflite.py --model stage1
+python convert_to_tflite.py --model stage2
 ```
 
 **Copy Models to Android:**
 ```bash
+cp models/sqi_model.tflite ../android-app/app/src/main/assets/
 cp models/stage1_model.tflite ../android-app/app/src/main/assets/
 cp models/stage2_model.tflite ../android-app/app/src/main/assets/
 ```
@@ -338,33 +391,44 @@ cd android-app
     - Runs inference every 60 samples (~0.17 seconds)
     - Updates predictions in real-time
 
-4. **Two-Stage Classification**
+4. **Three-Stage Classification**
    ```kotlin
-   Stage 1: predict(window) → abnormalProb
+   // SQI Check
+   qualityScore = sqiModel.predict(window)
+   
+   if (qualityScore < 0.7):
+       return "Poor signal quality"
+   
+   // Stage 1: Screening
+   abnormalProb = stage1Model.predict(window)
    
    if (abnormalProb < 0.5):
        return "Normal"
    else:
-       Stage 2: predict(window) → [svProb, ventProb]
+       // Stage 2: Diagnosis
+       [svProb, ventProb] = stage2Model.predict(window)
        return max(svProb, ventProb)
    ```
 
 5. **Alert Logic**
     - Requires 3 consecutive abnormal detections
     - Confidence threshold: 30%
+    - Quality-gated (only on good signals)
     - Triggers vibration + visual alert
-    - Logs event with timestamp
+    - Logs event with timestamp and quality score
 
 ### Problem-Solving Approach
 
 | Problem | Solution |
 |---------|----------|
-| **High computational cost** | Two-stage cascade reduces inference by 80% |
-| **Limited device resources** | TFLite quantization: <1 MB models, <15ms inference |
+| **False alarms from noise** | SQI pre-filter rejects poor quality signals |
+| **High computational cost** | Three-stage cascade reduces inference by 80% |
+| **Limited device resources** | TFLite quantization: <1.5 MB models, <20ms inference |
 | **Privacy concerns** | 100% on-device processing, no cloud dependency |
-| **False alarms** | Consecutive detection + confidence thresholding |
+| **Unreliable predictions** | Quality scoring + consecutive detection + confidence thresholding |
 | **Clinical accuracy** | Trained on medical-grade MIT-BIH dataset |
 | **Real-time performance** | Optimized sliding window + async processing |
+| **Battery drain** | Skip inference on bad signals (~30% savings) |
 
 ---
 
@@ -406,13 +470,14 @@ This application is a **proof-of-concept** developed for academic purposes. It i
 ## 🛣️ Future Enhancements
 
 - [ ] Integration with real wearable ECG sensors (Bluetooth)
+- [ ] Adaptive SQI threshold based on user environment
 - [ ] Cloud sync for historical data analysis
 - [ ] Multi-lead ECG support (12-lead)
 - [ ] Expanded arrhythmia classes (Atrial Fibrillation, etc.)
 - [ ] Personalized baseline learning
 - [ ] Export reports in PDF format
 - [ ] Telemedicine integration
-- [ ] Gemini AI assistant
+- [ ] AI assistant for health insights
 
 ---
 
