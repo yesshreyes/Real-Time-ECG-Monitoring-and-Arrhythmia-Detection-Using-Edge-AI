@@ -14,15 +14,15 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun EcgWaveform(
+    modifier: Modifier = Modifier,
     samples: List<Float>,
-    samplingRate: Int = 360, // Hz
-    modifier: Modifier = Modifier
+    samplingRate: Int = 360,
 ) {
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(220.dp)
-            .background(Color(0xFFFFFDFB)) // ECG paper
+            .background(Color(0xFFFFFDFB))
     ) {
 
         /* ---------- Physical calibration ---------- */
@@ -42,7 +42,7 @@ fun EcgWaveform(
 
         val centerY = size.height / 2
 
-        /* ---------- ECG grid (FIXED) ---------- */
+        /* ---------- ECG grid ---------- */
 
         val smallGrid = Color(0xFFFFCDD2)
         val bigGrid = Color(0xFFE57373)
@@ -75,13 +75,12 @@ fun EcgWaveform(
             row++
         }
 
-        /* ---------- ECG trace (FIXED) ---------- */
+        /* ---------- ECG trace ---------- */
 
         if (samples.size < 2) return@Canvas
 
         val path = Path()
 
-        // Only draw what fits the screen (CRITICAL FIX)
         val maxVisibleSamples = (size.width / pxPerSample).toInt()
         val visibleSamples = samples.takeLast(maxVisibleSamples)
 

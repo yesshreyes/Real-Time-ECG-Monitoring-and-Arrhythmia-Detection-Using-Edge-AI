@@ -31,12 +31,15 @@ fun MonitorScreen(
     val prediction by viewModel.prediction.collectAsState()
     val confidence by viewModel.confidence.collectAsState()
     val isAbnormal by viewModel.isAbnormal.collectAsState()
-
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-
-    // 🔥 THIS is what we capture
     val rootView = LocalView.current
+    val rhythmColor = when (prediction) {
+        "Normal" -> Color(0xFF2E7D32)
+        "Supraventricular Arrhythmia" -> Color(0xFFF9A825)
+        "Ventricular Arrhythmia" -> Color(0xFFC62828)
+        else -> Color.White
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -62,13 +65,6 @@ fun MonitorScreen(
             }
         }
         return
-    }
-
-    val rhythmColor = when (prediction) {
-        "Normal" -> Color(0xFF2E7D32)
-        "Supraventricular Arrhythmia" -> Color(0xFFF9A825)
-        "Ventricular Arrhythmia" -> Color(0xFFC62828)
-        else -> Color.White
     }
 
     Column(

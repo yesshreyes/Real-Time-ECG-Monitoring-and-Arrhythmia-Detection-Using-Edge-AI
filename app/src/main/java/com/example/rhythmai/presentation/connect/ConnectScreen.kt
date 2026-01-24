@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,12 +35,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rhythmai.ui.theme.DeepBlue
+import com.example.rhythmai.ui.theme.EcgGreen
+import com.example.rhythmai.ui.theme.MutedBlue
+import com.example.rhythmai.ui.theme.SoftGray
 import kotlinx.coroutines.delay
-
-private val EcgGreen = Color(0xFF00E676)
-private val DeepBlue = Color(0xFF0A1A2F)
-private val MutedBlue = Color(0xFF1E3A5F)
-private val SoftGray = Color(0xFFB0BEC5)
 
 @Composable
 fun ConnectScreen(
@@ -102,7 +100,6 @@ fun ConnectScreen(
 
             Box(contentAlignment = Alignment.Center) {
 
-                // 🔵 Pulse Ring
                 if (!connected) {
                     Box(
                         modifier = Modifier
@@ -113,7 +110,6 @@ fun ConnectScreen(
                     )
                 }
 
-                // 🔘 Main Button
                 Box(
                     modifier = Modifier
                         .size(160.dp)
