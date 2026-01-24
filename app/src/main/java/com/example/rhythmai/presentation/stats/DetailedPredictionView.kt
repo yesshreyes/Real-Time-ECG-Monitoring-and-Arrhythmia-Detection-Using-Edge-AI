@@ -43,7 +43,7 @@ fun DetailedPredictionView(
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = "Abnormal probability: ${(prediction.stage1AbnormalProb * 100).toInt()}%",
+                text = "Abnormal probability: ${(prediction.stage1AbnormalProb?.times(100))?.toInt()}%",
                 fontSize = 13.sp
             )
             // Stage 2 (if applicable)

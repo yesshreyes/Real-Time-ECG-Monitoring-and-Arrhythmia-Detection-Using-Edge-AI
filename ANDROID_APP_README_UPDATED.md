@@ -67,21 +67,14 @@ RhythmAI is an **Android application** that performs **real-time ECG monitoring 
 
 Here are some early previews from the app:
 
+| Monitor Screen | Stats Screen |
+| :------------: | :----------: |
+| <img src="assets/monitor_screen.jpeg" alt="Monitor Screen" width="200"/> | <img src="assets/stats_screen.jpeg" alt="Stats Screen" width="200"/> |
 
-### Monitor Screen
-| Light Mode | Dark Mode |
-| :--------: | :-------: |
-| <img src="assets/monitor_screen_light.jpeg" alt="Monitor Screen Light" width="200"/> | <img src="assets/monitor_screen_dark.jpeg" alt="Monitor Screen Dark" width="200"/> |
-
-### Stats Screen
-| Light Mode | Dark Mode |
-| :--------: | :-------: |
-| <img src="assets/stats_screen_light.jpeg" alt="Stats Screen Light" width="200"/> | <img src="assets/stats_screen_dark.jpeg" alt="Stats Screen Dark" width="200"/> |
-
-### Device Connection
 | Searching Devices | Device Connected |
 | :---------------: | :---------------: |
 | <img src="assets/searching_devices.jpeg" alt="Searching Devices" width="200"/> | <img src="assets/connected.jpeg" alt="Device Connected" width="200"/> |
+
 ---
 
 ## 🏗 System Architecture
