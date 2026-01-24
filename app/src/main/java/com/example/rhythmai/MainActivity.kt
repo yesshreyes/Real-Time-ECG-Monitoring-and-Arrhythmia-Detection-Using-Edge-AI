@@ -17,7 +17,6 @@ import com.example.rhythmai.ui.theme.RhythmAITheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             RhythmAITheme {
                 AppNavGraph()
