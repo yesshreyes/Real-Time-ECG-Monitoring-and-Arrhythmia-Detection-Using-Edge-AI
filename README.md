@@ -66,11 +66,11 @@ Here are some early previews from the app:
 
 | Monitor Screen | Stats Screen |
 | :------------: | :----------: |
-| <img src="assets/monitor_screen.png" alt="Monitor Screen" width="200"/> | <img src="assets/stats_screen.png" alt="Stats Screen" width="200"/> |
+| <img src="assets/monitor_screen.jpeg" alt="Monitor Screen" width="200"/> | <img src="assets/stats_screen.jpeg" alt="Stats Screen" width="200"/> |
 
 | Searching Devices | Device Connected |
 | :---------------: | :---------------: |
-| <img src="assets/searching_devices.png" alt="Searching Devices" width="200"/> | <img src="assets/connected.png" alt="Device Connected" width="200"/> |
+| <img src="assets/searching_devices.jpeg" alt="Searching Devices" width="200"/> | <img src="assets/connected.jpeg" alt="Device Connected" width="200"/> |
 
 ---
 
