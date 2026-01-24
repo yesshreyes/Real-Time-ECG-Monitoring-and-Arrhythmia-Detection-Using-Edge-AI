@@ -1,16 +1,24 @@
 package com.example.rhythmai.presentation.monitor
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun MonitorScreen(
@@ -24,8 +32,11 @@ fun MonitorScreen(
     val confidence by viewModel.confidence.collectAsState()
     val isAbnormal by viewModel.isAbnormal.collectAsState()
 
-
     val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // 🔥 THIS is what we capture
+    val rootView = LocalView.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -54,9 +65,9 @@ fun MonitorScreen(
     }
 
     val rhythmColor = when (prediction) {
-        "Normal" -> Color(0xFF2E7D32) // green
-        "Supraventricular Arrhythmia" -> Color(0xFFF9A825) // amber
-        "Ventricular Arrhythmia" -> Color(0xFFC62828) // red
+        "Normal" -> Color(0xFF2E7D32)
+        "Supraventricular Arrhythmia" -> Color(0xFFF9A825)
+        "Ventricular Arrhythmia" -> Color(0xFFC62828)
         else -> Color.White
     }
 
@@ -64,6 +75,7 @@ fun MonitorScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
 
         /* ---------- HEADER ---------- */
@@ -76,52 +88,63 @@ fun MonitorScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        /* ---------- ECG WAVEFORM ---------- */
+        /* ---------- ECG + STATS (CAPTURED AREA) ---------- */
 
         EcgWaveform(samples = samples)
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-        /* ---------- HEART RATE ---------- */
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Heart Rate", fontSize = 14.sp, color = Color.Gray)
+                Text("$bpm BPM", fontSize = 28.sp)
+            }
 
-        Text(
-            text = "Heart Rate",
-            fontSize = 14.sp,
-            color = Color.Gray
-        )
-
-        Text(
-            text = "$bpm BPM",
-            fontSize = 28.sp,
-            style = MaterialTheme.typography.headlineMedium
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        /* ---------- RHYTHM ANALYSIS ---------- */
-
-        Text(
-            text = "Rhythm Analysis",
-            fontSize = 18.sp,
-            style = MaterialTheme.typography.titleMedium
-        )
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        viewModel.captureEcgFromView(rootView)
+                    }
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = "Capture ECG",
+                    tint = Color(0xFF2E7D32),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
         Text(
             text = prediction,
-            fontSize = 20.sp,
-            color = rhythmColor,
-            style = MaterialTheme.typography.titleLarge
+            fontSize = 18.sp,
+            color = rhythmColor
         )
 
         Text(
             text = "Confidence: ${(confidence * 100).toInt()}%",
-            fontSize = 14.sp,
+            fontSize = 12.sp,
             color = Color.Gray
         )
 
-        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "Recorded: ${
+                SimpleDateFormat(
+                    "dd-MM-yyyy HH:mm:ss",
+                    Locale.getDefault()
+                ).format(Date())
+            }",
+            fontSize = 11.sp,
+            color = Color.Gray
+        )
+
+        Spacer(Modifier.height(16.dp))
 
         /* ---------- ALERT ---------- */
 
@@ -132,9 +155,7 @@ fun MonitorScreen(
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp)
-                ) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         text = "⚠ Possible Arrhythmia Detected",
                         color = Color(0xFFC62828),
@@ -143,8 +164,9 @@ fun MonitorScreen(
 
                     Spacer(Modifier.height(8.dp))
 
+                    val context = LocalView.current.context
                     Button(
-                        onClick = { /* SOS / demo action */ },
+                        onClick = { viewModel.openEmergencyDialer(context) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFC62828)
                         )

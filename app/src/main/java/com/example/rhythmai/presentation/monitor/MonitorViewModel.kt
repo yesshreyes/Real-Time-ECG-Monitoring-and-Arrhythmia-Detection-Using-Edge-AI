@@ -1,10 +1,19 @@
 package com.example.rhythmai.presentation.monitor
 
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
+import android.provider.MediaStore
+import android.view.View
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.core.view.drawToBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rhythmai.data.EcgAssetLoader
-import com.example.rhythmai.data.EcgTFLiteClassifier
+import com.example.rhythmai.data.EcgTwoStageClassifier
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +36,6 @@ class MonitorViewModel(
     private val _isLoading = MutableStateFlow(true)
     val isLoading = _isLoading.asStateFlow()
 
-    // 🔥 ML OUTPUT
     private val _prediction = MutableStateFlow("Normal")
     val prediction = _prediction.asStateFlow()
 
@@ -36,7 +44,7 @@ class MonitorViewModel(
 
     /* ---------------- INTERNAL STATE ---------------- */
 
-    private val maxSamples = 300
+    private val maxSamples = 360 * 6
     private var monitoringJob: Job? = null
 
     // ECG data
@@ -47,12 +55,12 @@ class MonitorViewModel(
     private var lastPeakTime = 0L
     private var lastSample = 0f
 
-    // 🔥 SLIDING WINDOW FOR ML
+    //SLIDING WINDOW FOR ML
     private val inferenceWindowSize = 360
     private val inferenceBuffer = ArrayDeque<Float>()
 
     // TFLite
-    private lateinit var classifier: EcgTFLiteClassifier
+    private lateinit var classifier: EcgTwoStageClassifier
 
     private var lastAbnormalState = false
 
@@ -65,6 +73,12 @@ class MonitorViewModel(
     private var consecutiveAbnormalCount = 0
 
 
+    private val _stage1Threshold = MutableStateFlow(0.5f)
+    val stage1Threshold = _stage1Threshold.asStateFlow()
+    fun updateStage1Threshold(newThreshold: Float) {
+        _stage1Threshold.value = newThreshold.coerceIn(0.1f, 0.9f)
+        // Recreate classifier with new threshold
+    }
 
     /* ---------------- LIFECYCLE ---------------- */
 
@@ -81,7 +95,7 @@ class MonitorViewModel(
                         fileName = "200_ekg.csv",
                         leadName = "MLII"
                     )
-                    classifier = EcgTFLiteClassifier(context)
+                    classifier = EcgTwoStageClassifier(context)
                 }
             }
 
@@ -144,29 +158,27 @@ class MonitorViewModel(
 
     private fun runInference() {
         val window = inferenceBuffer.toFloatArray()
-        val (result, conf) = classifier.predict(window)
 
+        // Use two-stage prediction
+        val (result, conf) = classifier.predict(window)
         _prediction.value = result
         _confidence.value = conf
-
+        // Better abnormal detection logic
         val abnormalWithConfidence =
             result != "Normal" && conf >= CONFIDENCE_THRESHOLD
-
         if (abnormalWithConfidence) {
             consecutiveAbnormalCount++
         } else {
             consecutiveAbnormalCount = 0
         }
-
         if (
             consecutiveAbnormalCount >= REQUIRED_CONSECUTIVE_ABNORMAL &&
             !_alertLatched.value
         ) {
             _alertLatched.value = true
             _isAbnormal.value = true
-
             triggerVibration()
-            logArrhythmiaEvent(conf)
+            logArrhythmiaEvent(result, conf)  // Pass result type
         }
     }
 
@@ -191,12 +203,12 @@ class MonitorViewModel(
         MutableStateFlow<List<ArrhythmiaEvent>>(emptyList())
     val events = _events.asStateFlow()
 
-    private fun logArrhythmiaEvent(confidence: Float) {
+    private fun logArrhythmiaEvent(arrhythmiaType: String, confidence: Float) {
         val event = ArrhythmiaEvent(
             timestamp = System.currentTimeMillis(),
+            arrhythmiaType = arrhythmiaType,  // New field
             confidence = confidence
         )
-
         _events.value = _events.value + event
     }
 
@@ -204,11 +216,46 @@ class MonitorViewModel(
         _alertLatched.value = false
     }
 
+    fun openEmergencyDialer(context: Context) {
+        val intent = Intent(Intent.ACTION_DIAL).apply {
+            data = Uri.parse("tel:112")
+        }
+        context.startActivity(intent)
+    }
+
+    suspend fun captureEcgFromView(view: View) {
+        withContext(Dispatchers.Main) {
+            val bitmap = view.drawToBitmap()
+            saveBitmapToGallery(bitmap)
+        }
+    }
+
+    private fun saveBitmapToGallery(bitmap: Bitmap) {
+        val filename = "ECG_${System.currentTimeMillis()}.png"
+
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/RhythmAI")
+        }
+
+        val resolver = context.contentResolver
+        val uri = resolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            values
+        ) ?: return
+
+        resolver.openOutputStream(uri)?.use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+    }
+
+
 
 }
-
 data class ArrhythmiaEvent(
     val timestamp: Long,
+    val arrhythmiaType: String,
     val confidence: Float
 )
 
