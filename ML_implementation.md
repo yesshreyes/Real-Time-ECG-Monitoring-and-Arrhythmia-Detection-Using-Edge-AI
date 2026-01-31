@@ -1,10 +1,11 @@
-# Two-Stage ECG Arrhythmia Detection System
+# Three-Stage ECG Arrhythmia Detection System
 
 Implementation plan for building a hierarchical ECG classification system optimized for edge deployment.
 
 ## Overview
 
-This system implements a **two-stage cascade architecture**:
+This system implements a **three-stage cascade architecture**:
+- **Stage 0 (SQI)**: Ultra-lightweight signal quality filter (Good vs Bad) - quality screening
 - **Stage 1**: Lightweight binary classifier (Normal vs Abnormal) - high sensitivity screening
 - **Stage 2**: Multi-class classifier (Supraventricular vs Ventricular arrhythmia) - precise diagnosis
 
@@ -77,11 +78,11 @@ The models will be trained on the MIT-BIH Arrhythmia Dataset and optimized for e
 
 **Implementation Details:**
 - Pan-Tompkins algorithm stages:
-  1. Band-pass filtering (5-15 Hz)
-  2. Derivative filter
-  3. Squaring
-  4. Moving window integration
-  5. Adaptive thresholding
+    1. Band-pass filtering (5-15 Hz)
+    2. Derivative filter
+    3. Squaring
+    4. Moving window integration
+    5. Adaptive thresholding
 - Window extraction: 180 samples before R-peak, 180 samples after (total 360 samples ≈ 1 second)
 - Align windows consistently for model input
 
@@ -104,6 +105,27 @@ The models will be trained on the MIT-BIH Arrhythmia Dataset and optimized for e
 | A, a, J, S, n  | Supraventricular | 1 (Abnormal) | 0 (SV)        |
 | V, r, E, F     | Ventricular    | 1 (Abnormal)  | 1 (Ventricular) |
 | /, f, Q, ?     | Excluded       | Excluded      | Excluded      |
+
+---
+
+#### [NEW] [sqi_labeling.py](file:///c:/Users/Shreyas/Downloads/RhythmAI-MLModeTrainging/src/sqi_labeling.py)
+
+**Purpose**: Generate Signal Quality Index labels
+
+**Key Functions:**
+- `calculate_snr(signal)`: Calculate signal-to-noise ratio
+- `calculate_baseline_stability(signal)`: Measure baseline wander
+- `calculate_kurtosis(signal)`: Measure signal distribution
+- `label_signal_quality(signal)`: Assign GOOD/BAD label based on quality metrics
+
+**Quality Criteria:**
+- **GOOD signals**: SNR > 10 dB, baseline stability < 0.15, kurtosis 3-7
+- **BAD signals**: SNR ≤ 10 dB, excessive baseline wander, or abnormal kurtosis
+
+**Implementation Details:**
+- Apply quality metrics to each beat window
+- Use thresholds based on clinical standards
+- Generate binary labels (0=BAD, 1=GOOD)
 
 ---
 
@@ -141,6 +163,51 @@ The models will be trained on the MIT-BIH Arrhythmia Dataset and optimized for e
 ---
 
 ### Model Architectures
+
+#### [NEW] [models/sqi_model.py](file:///c:/Users/Shreyas/Downloads/RhythmAI-MLModeTrainging/src/models/sqi_model.py)
+
+**Purpose**: Stage 0 - Signal Quality Index Model
+
+**Architecture**: Ultra-lightweight 1D CNN
+
+```
+Input: (360, 1) - 1-second ECG window
+
+Block 1 (Initial features):
+  - Conv1D(16 filters, kernel=5, padding=same)
+  - BatchNormalization
+  - ReLU activation
+  - MaxPooling1D(pool_size=2)
+  - Dropout(0.2)
+
+Block 2 (Mid-level features):
+  - Conv1D(32 filters, kernel=3, padding=same)
+  - BatchNormalization
+  - ReLU activation
+  - MaxPooling1D(pool_size=2)
+  - Dropout(0.3)
+
+Block 3 (High-level features):
+  - Conv1D(64 filters, kernel=3, padding=same)
+  - BatchNormalization
+  - ReLU activation
+  - GlobalAveragePooling1D
+
+Classification Head:
+  - Dense(16, activation=relu)
+  - Dropout(0.3)
+  - Dense(1, activation=sigmoid)
+
+Output: Quality score (0=BAD, 1=GOOD)
+```
+
+**Design Rationale:**
+- Minimal parameter count (~15K) for fastest inference
+- Simple architecture for binary quality assessment
+- Serves as pre-filter before arrhythmia detection
+- Sigmoid output for quality probability
+
+---
 
 #### [NEW] [models/stage1_model.py](file:///c:/Users/Shreyas/Downloads/RhythmAI-MLModeTrainging/src/models/stage1_model.py)
 
@@ -240,6 +307,31 @@ Output: Class probabilities (SV vs Ventricular)
 
 ### Training Pipeline
 
+#### [NEW] [train_sqi.py](file:///c:/Users/Shreyas/Downloads/RhythmAI-MLModeTrainging/src/train_sqi.py)
+
+**Purpose**: Train SQI signal quality model
+
+**Training Configuration:**
+- **Loss**: Binary cross-entropy
+- **Optimizer**: Adam (lr=0.001)
+- **Batch size**: 64
+- **Epochs**: 50 (with early stopping)
+- **Callbacks**:
+    - EarlyStopping (patience=10, monitor='val_loss')
+    - ReduceLROnPlateau (patience=5, factor=0.5)
+    - ModelCheckpoint (save best model based on val_accuracy)
+
+**Key Metrics:**
+- **Primary**: Accuracy
+- **Secondary**: Precision, Recall, AUC
+
+**Implementation Details:**
+- Use quality-labeled data from `sqi_labeling.py`
+- Balance GOOD and BAD quality samples
+- Save training history for analysis
+
+---
+
 #### [NEW] [train_stage1.py](file:///c:/Users/Shreyas/Downloads/RhythmAI-MLModeTrainging/src/train_stage1.py)
 
 **Purpose**: Train Stage 1 abnormality screening model
@@ -251,9 +343,9 @@ Output: Class probabilities (SV vs Ventricular)
 - **Epochs**: 100 (with early stopping)
 - **Class weighting**: Compute from class distribution to handle imbalance
 - **Callbacks**:
-  - EarlyStopping (patience=15, monitor='val_loss')
-  - ReduceLROnPlateau (patience=7, factor=0.5)
-  - ModelCheckpoint (save best model based on val_sensitivity)
+    - EarlyStopping (patience=15, monitor='val_loss')
+    - ReduceLROnPlateau (patience=7, factor=0.5)
+    - ModelCheckpoint (save best model based on val_recall)
 
 **Key Metrics:**
 - **Primary**: Sensitivity (Recall) - minimize false negatives
@@ -277,9 +369,9 @@ Output: Class probabilities (SV vs Ventricular)
 - **Epochs**: 150 (with early stopping)
 - **Class balancing**: Oversample minority class or use class weights
 - **Callbacks**:
-  - EarlyStopping (patience=20, monitor='val_loss')
-  - ReduceLROnPlateau (patience=10, factor=0.5)
-  - ModelCheckpoint (save best model based on val_f1_score)
+    - EarlyStopping (patience=20, monitor='val_loss')
+    - ReduceLROnPlateau (patience=10, factor=0.5)
+    - ModelCheckpoint (save best model based on val_f1_score)
 
 **Key Metrics:**
 - **Primary**: F1-score (balanced precision and recall)
@@ -299,13 +391,20 @@ Output: Class probabilities (SV vs Ventricular)
 **Purpose**: Comprehensive model evaluation
 
 **Key Functions:**
+- `evaluate_sqi(model, val_data)`: SQI metrics
 - `evaluate_stage1(model, val_data)`: Stage 1 metrics
 - `evaluate_stage2(model, val_data)`: Stage 2 metrics
 - `plot_confusion_matrix(y_true, y_pred, labels)`: Visualize confusion matrix
-- `plot_roc_curve(y_true, y_scores)`: ROC curve for Stage 1
+- `plot_roc_curve(y_true, y_scores)`: ROC curve for binary classifiers
 - `analyze_misclassifications(model, val_data)`: Identify failure cases
 
 **Medical Metrics:**
+
+**SQI (Quality Assessment):**
+- **Accuracy**: Overall quality classification accuracy
+- **Precision**: Proportion of predicted GOOD signals that are truly good
+- **Recall**: Proportion of actual GOOD signals correctly identified
+- **AUC**: Overall discriminative ability
 
 **Stage 1 (Abnormality Screening):**
 - **Sensitivity (Recall)**: TP / (TP + FN) - critical for screening
@@ -332,6 +431,7 @@ Output: Class probabilities (SV vs Ventricular)
 - `plot_beat_samples(beats, labels)`: Visualize beat windows by class
 - `plot_training_history(history)`: Training curves (loss, accuracy, etc.)
 - `plot_class_distribution(labels)`: Dataset balance analysis
+- `plot_quality_distribution(quality_scores)`: SQI score distribution
 
 ---
 
@@ -349,16 +449,16 @@ Output: Class probabilities (SV vs Ventricular)
 **Quantization Strategies:**
 
 1. **Dynamic Range Quantization** (Default):
-   - Post-training quantization
-   - Weights: INT8, Activations: FLOAT32
-   - ~4x size reduction, minimal accuracy loss
-   - No representative dataset required
+    - Post-training quantization
+    - Weights: INT8, Activations: FLOAT32
+    - ~4x size reduction, minimal accuracy loss
+    - No representative dataset required
 
 2. **Full Integer Quantization** (Optional):
-   - Weights and activations: INT8
-   - ~4x size reduction, ~2-4x speedup
-   - Requires representative dataset
-   - Slight accuracy degradation (acceptable if <2%)
+    - Weights and activations: INT8
+    - ~4x size reduction, ~2-4x speedup
+    - Requires representative dataset
+    - Slight accuracy degradation (acceptable if <2%)
 
 **Implementation Details:**
 - Use `tf.lite.TFLiteConverter.from_keras_model()`
@@ -370,24 +470,28 @@ Output: Class probabilities (SV vs Ventricular)
 
 #### [NEW] [inference.py](file:///c:/Users/Shreyas/Downloads/RhythmAI-MLModeTrainging/src/inference.py)
 
-**Purpose**: Two-stage inference pipeline
+**Purpose**: Three-stage inference pipeline
 
 **Key Functions:**
-- `predict_two_stage(ecg_window, stage1_model, stage2_model)`: Complete inference
+- `predict_three_stage(ecg_window, sqi_model, stage1_model, stage2_model)`: Complete inference
 - `load_tflite_model(model_path)`: Load TFLite model
 - `run_tflite_inference(interpreter, input_data)`: Run TFLite inference
 
 **Inference Flow:**
 1. Preprocess ECG window (filter, normalize)
-2. Run Stage 1 model:
-   - If Normal (prob < threshold): Return "Normal"
-   - If Abnormal (prob ≥ threshold): Proceed to Stage 2
-3. Run Stage 2 model:
-   - Return "Supraventricular" or "Ventricular"
+2. Run SQI model:
+    - If BAD quality (score < threshold): Return "BAD_QUALITY"
+    - If GOOD quality (score ≥ threshold): Proceed to Stage 1
+3. Run Stage 1 model:
+    - If Normal (prob < threshold): Return "Normal"
+    - If Abnormal (prob ≥ threshold): Proceed to Stage 2
+4. Run Stage 2 model:
+    - Return "Supraventricular" or "Ventricular"
 
 **Threshold Tuning:**
-- Adjust Stage 1 threshold to balance sensitivity vs specificity
-- Default: 0.5, but can lower to 0.3 for higher sensitivity
+- SQI threshold: 0.5 (default) - adjustable for quality sensitivity
+- Stage 1 threshold: 0.5 (default) - can lower to 0.3 for higher sensitivity
+- Stage 2: Argmax of softmax probabilities
 
 ---
 
@@ -404,12 +508,15 @@ RhythmAI-MLModeTrainging/
 │   ├── preprocessing.py
 │   ├── segmentation.py
 │   ├── label_engineering.py
+│   ├── sqi_labeling.py
 │   ├── data_split.py
 │   ├── augmentation.py
 │   ├── models/
 │   │   ├── __init__.py
+│   │   ├── sqi_model.py
 │   │   ├── stage1_model.py
 │   │   └── stage2_model.py
+│   ├── train_sqi.py
 │   ├── train_stage1.py
 │   ├── train_stage2.py
 │   ├── evaluate.py
@@ -422,9 +529,11 @@ RhythmAI-MLModeTrainging/
 │   ├── 03_model_training.ipynb
 │   └── 04_edge_optimization.ipynb
 ├── models/
+│   ├── sqi_model.h5
+│   ├── sqi_model.tflite
 │   ├── stage1_model.h5
-│   ├── stage2_model.h5
 │   ├── stage1_model.tflite
+│   ├── stage2_model.h5
 │   └── stage2_model.tflite
 ├── results/
 │   ├── training_history/
@@ -467,6 +576,7 @@ python -m pytest tests/test_data_pipeline.py -v
 - Verify symbol-to-class mapping for all annotation types
 - Check Stage 1 label distribution (Normal vs Abnormal)
 - Check Stage 2 label distribution (SV vs Ventricular)
+- Validate SQI label generation (GOOD vs BAD)
 - Ensure excluded symbols (/, f, Q, ?) are filtered out
 - Validate inter-patient split (no patient overlap between train/val)
 
@@ -482,11 +592,13 @@ python -m pytest tests/test_label_engineering.py -v
 **Test Script**: `tests/test_models.py`
 
 **Test Cases:**
+- SQI model input shape: (None, 360, 1)
+- SQI model output shape: (None, 1)
 - Stage 1 model input shape: (None, 360, 1)
 - Stage 1 model output shape: (None, 1)
 - Stage 2 model input shape: (None, 360, 1)
 - Stage 2 model output shape: (None, 2)
-- Verify parameter counts (Stage 1 < 100K, Stage 2 < 200K)
+- Verify parameter counts (SQI < 20K, Stage 1 < 100K, Stage 2 < 200K)
 - Test forward pass with dummy data
 
 **Run Command:**
@@ -498,7 +610,30 @@ python -m pytest tests/test_models.py -v
 
 ### Training Validation
 
-#### 4. Stage 1 Model Training
+#### 4. SQI Model Training
+
+**Script**: `src/train_sqi.py`
+
+**Success Criteria:**
+- Training completes without errors
+- Validation accuracy ≥ 90%
+- Validation AUC ≥ 0.95
+- Model converges (loss decreases over epochs)
+- No severe overfitting (train-val gap < 10%)
+
+**Run Command:**
+```bash
+python src/train_sqi.py --dataset_path ../MIT-BIH_Arrhythmia_Dataset --epochs 50 --batch_size 64
+```
+
+**Expected Output:**
+- Saved model: `models/sqi_model.h5`
+- Training history: `results/sqi_training_history.png`
+- Validation metrics printed to console
+
+---
+
+#### 5. Stage 1 Model Training
 
 **Script**: `src/train_stage1.py`
 
@@ -511,7 +646,7 @@ python -m pytest tests/test_models.py -v
 
 **Run Command:**
 ```bash
-python src/train_stage1.py --epochs 100 --batch_size 64
+python src/train_stage1.py --dataset_path ../MIT-BIH_Arrhythmia_Dataset --epochs 100 --batch_size 64
 ```
 
 **Expected Output:**
@@ -521,7 +656,7 @@ python src/train_stage1.py --epochs 100 --batch_size 64
 
 ---
 
-#### 5. Stage 2 Model Training
+#### 6. Stage 2 Model Training
 
 **Script**: `src/train_stage2.py`
 
@@ -533,7 +668,7 @@ python src/train_stage1.py --epochs 100 --batch_size 64
 
 **Run Command:**
 ```bash
-python src/train_stage2.py --epochs 150 --batch_size 32
+python src/train_stage2.py --dataset_path ../MIT-BIH_Arrhythmia_Dataset --epochs 150 --batch_size 32
 ```
 
 **Expected Output:**
@@ -545,11 +680,17 @@ python src/train_stage2.py --epochs 150 --batch_size 32
 
 ### Evaluation Validation
 
-#### 6. Comprehensive Model Evaluation
+#### 7. Comprehensive Model Evaluation
 
 **Script**: `src/evaluate.py`
 
 **Metrics to Validate:**
+
+**SQI:**
+- Accuracy ≥ 90%
+- Precision ≥ 88%
+- Recall ≥ 88%
+- AUC ≥ 0.95
 
 **Stage 1:**
 - Sensitivity ≥ 95%
@@ -564,65 +705,65 @@ python src/train_stage2.py --epochs 150 --batch_size 32
 
 **Run Command:**
 ```bash
-python src/evaluate.py --stage1_model models/stage1_model.h5 --stage2_model models/stage2_model.h5
+python src/evaluate.py --sqi_model models/sqi_model.h5 --stage1_model models/stage1_model.h5 --stage2_model models/stage2_model.h5
 ```
 
 **Expected Output:**
 - Detailed metrics report: `results/evaluation_metrics/evaluation_report.txt`
-- ROC curve: `results/evaluation_metrics/stage1_roc_curve.png`
+- ROC curves: `results/evaluation_metrics/roc_curves.png`
 - Confusion matrices: `results/evaluation_metrics/confusion_matrices.png`
 
 ---
 
 ### Edge Optimization Validation
 
-#### 7. TensorFlow Lite Conversion
+#### 8. TensorFlow Lite Conversion
 
 **Script**: `src/convert_to_tflite.py`
 
 **Success Criteria:**
 - Models convert successfully to TFLite format
-- Dynamic quantization reduces model size by ~75%
+- Dynamic quantization reduces model size by ~90%
 - Accuracy degradation < 2% compared to Keras models
-- Inference time < 10ms per beat on CPU
+- Inference time < 15ms per beat on CPU (all 3 stages)
 
 **Run Command:**
 ```bash
-python src/convert_to_tflite.py --stage1_model models/stage1_model.h5 --stage2_model models/stage2_model.h5 --quantization dynamic
+python src/convert_to_tflite.py --convert_both --dataset_path ../MIT-BIH_Arrhythmia_Dataset
 ```
 
 **Expected Output:**
-- TFLite models: `models/stage1_model.tflite`, `models/stage2_model.tflite`
+- TFLite models: `models/sqi_model.tflite`, `models/stage1_model.tflite`, `models/stage2_model.tflite`
 - Benchmark report: `results/edge_optimization/tflite_benchmark.txt`
-- Size comparison: Keras (~2MB) → TFLite (~500KB)
+- Size comparison: Total Keras (~7.4MB) → Total TFLite (~654KB)
 
 ---
 
-#### 8. End-to-End Inference Test
+#### 9. End-to-End Inference Test
 
 **Script**: `src/inference.py`
 
 **Test Cases:**
 - Load TFLite models successfully
-- Run two-stage inference on validation set
+- Run three-stage inference on validation set
 - Verify output format (class label + confidence)
 - Measure average inference time per beat
 
 **Run Command:**
 ```bash
-python src/inference.py --test_samples 1000
+python src/inference.py --test_samples 1000 --use_tflite
 ```
 
 **Expected Output:**
 - Inference results: `results/inference_results.json`
-- Average inference time: < 10ms per beat
+- Average inference time: < 15ms per beat (all 3 stages)
 - Classification accuracy matches evaluation metrics
 
 ---
 
 ### Visualization Validation
 
-#### 9. Data Exploration Notebook
+#### 10. Data Exploration Notebook
 
 **Notebook**: `notebooks/01_data_exploration.ipynb`
 
@@ -631,6 +772,7 @@ python src/inference.py --test_samples 1000
 2. Display annotation distribution across all patients
 3. Plot class imbalance (Normal vs SV vs Ventricular)
 4. Visualize beat-to-beat variability
+5. Show signal quality distribution
 
 **Run Command:**
 ```bash
@@ -639,7 +781,7 @@ jupyter notebook notebooks/01_data_exploration.ipynb
 
 ---
 
-#### 10. Preprocessing Validation Notebook
+#### 11. Preprocessing Validation Notebook
 
 **Notebook**: `notebooks/02_preprocessing_validation.ipynb`
 
@@ -648,6 +790,7 @@ jupyter notebook notebooks/01_data_exploration.ipynb
 2. Visualize R-peak detection on 10 sample beats
 3. Display extracted beat windows (aligned)
 4. Show augmentation effects (noise, baseline wander, scaling)
+5. Demonstrate quality assessment on sample beats
 
 **Run Command:**
 ```bash
@@ -680,14 +823,14 @@ pip install -r requirements.txt
 
 ## Success Metrics Summary
 
-| Metric | Stage 1 Target | Stage 2 Target |
-|--------|----------------|----------------|
-| Sensitivity | ≥ 95% | N/A |
-| Specificity | ≥ 85% | N/A |
-| F1-Score | ≥ 90% | ≥ 90% |
-| Per-Class Recall | N/A | ≥ 85% (both classes) |
-| Model Size (TFLite) | < 500 KB | < 1 MB |
-| Inference Time | < 5 ms | < 10 ms |
-| Accuracy Degradation (TFLite) | < 2% | < 2% |
+| Metric | SQI Target | Stage 1 Target | Stage 2 Target |
+|--------|------------|----------------|----------------|
+| Accuracy/F1 | ≥ 90% | ≥ 90% | ≥ 90% |
+| Sensitivity | N/A | ≥ 95% | N/A |
+| Specificity | N/A | ≥ 85% | N/A |
+| Per-Class Recall | N/A | N/A | ≥ 85% (both classes) |
+| Model Size (TFLite) | < 20 KB | < 100 KB | < 600 KB |
+| Inference Time | < 2 ms | < 5 ms | < 10 ms |
+| Accuracy Degradation (TFLite) | < 2% | < 2% | < 2% |
 
 ---
