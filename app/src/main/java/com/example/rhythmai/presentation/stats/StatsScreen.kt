@@ -41,34 +41,6 @@ fun StatsScreen(
                 ArrhythmiaEventItem(event)
             }
         }
-        item { Divider() }
-        /* ---------------- MODEL ARCHITECTURE ---------------- */
-        item {
-            SectionTitle("Three-Stage Model Architecture")
-
-            StatRow("SQI Model", "Signal Quality Filter (~15K params)")
-            StatRow("Stage 1", "Normal vs Abnormal (~50K params)")
-            StatRow("Stage 2", "SV vs Ventricular (~150K params)")
-
-            SmallNote(
-                "Three-stage cascade: SQI filters bad signals → Stage 1 screens abnormalities → Stage 2 diagnoses arrhythmia type."
-            )
-        }
-
-        item { Divider() }
-        /* ---------------- MODEL PERFORMANCE ---------------- */
-        item {
-            SectionTitle("Model Performance")
-            viewModel.modelPerformance.forEach {
-                StatRow(it.first, it.second)
-            }
-            SmallNote(
-                "Metrics from offline evaluation on MIT-BIH Arrhythmia Database. SQI model prevents false alarms from noisy signals."
-            )
-        }
-
-
-
     }
 }
 
