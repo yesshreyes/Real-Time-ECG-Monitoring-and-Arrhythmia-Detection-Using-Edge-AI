@@ -51,19 +51,9 @@ fun ArrhythmiaEventItem(event: ArrhythmiaEvent) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
-                // NEW: Show quality score
-                Text(
-                    text = "Quality: ${(event.qualityScore * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (event.qualityScore >= 0.7f) {
-                        Color(0xFF4CAF50)
-                    } else {
-                        Color(0xFFFF9800)
-                    }
-                )
+
             }
 
-            // Confidence badge
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = when (event.arrhythmiaType) {
